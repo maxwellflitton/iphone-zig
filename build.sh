@@ -34,12 +34,15 @@ mkdir "$APP.app"
 cp "build/$APP" Info.plist "$APP.app/"
 codesign --force --sign - "$APP.app"
 
-# Start a simulator from Xcode first if none is running.
+# Use the booted simulator, or boot the first available iPhone if none is.
+UDID="$(xcrun simctl list devices booted | grep -m1 -oE '[0-9A-F-]{36}' || true)"
+if [ -z "$UDID" ]; then
+    UDID="$(xcrun simctl list devices available | grep -m1 iPhone | grep -oE '[0-9A-F-]{36}')"
+    echo "Booting simulator $UDID..."
+    xcrun simctl boot "$UDID"
+fi
+xcrun simctl bootstatus "$UDID" -b >/dev/null
 open -a Simulator
-xcrun simctl bootstatus booted >/dev/null 2>&1 || {
-    echo "Built $APP.app. Boot a simulator, then run:"
-    echo "  xcrun simctl install booted $APP.app && xcrun simctl launch booted $BUNDLE_ID"
-    exit 0
-}
-xcrun simctl install booted "$APP.app"
-xcrun simctl launch booted "$BUNDLE_ID"
+
+xcrun simctl install "$UDID" "$APP.app"
+xcrun simctl launch "$UDID" "$BUNDLE_ID"
